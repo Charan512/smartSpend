@@ -4,8 +4,8 @@ import axios from "axios";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ArrowUpRight, Bot, FileUp, LogOut, Send, User, UploadCloud, Target, PlusCircle, Settings2 } from 'lucide-react';
 
-const API_BASE = "http://localhost:8000";
-const WS_BASE = "ws://localhost:8000";
+const API_BASE = "https://smartspent.onrender.com";
+const WS_BASE = "wss://smartspent.onrender.com";
 
 export default function DashboardPage() {
   const [userId, setUserId] = useState(null);
