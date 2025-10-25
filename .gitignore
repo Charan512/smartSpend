@@ -9,11 +9,18 @@ venv/
 .venv/
 .env
 
+# Model files
+*.pkl
+*.h5
+
 # Node.js
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Next.js
+.next/
 
 # Database
 *.db
