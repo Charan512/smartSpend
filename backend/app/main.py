@@ -16,20 +16,13 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Smart Expense Tracker API")
 
 # --- CORS ---
-# For production, you'll want to update this to include your Vercel URL
-frontend_urls = ["http://localhost:3000", "http://127.0.0.1:3000"]
-if os.getenv("VERCEL_URL"):
-    frontend_urls.append(os.getenv("VERCEL_URL"))
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=frontend_urls,  
+    allow_origins=["https://smart-spend-j245.vercel.app"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
-
-# --- DB dependency ---
+)# --- DB dependency ---
 def get_db():
     db = database.SessionLocal()
     try:
