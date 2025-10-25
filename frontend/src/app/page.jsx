@@ -4,6 +4,7 @@ import axios from "axios";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ArrowUpRight, Bot, FileUp, LogOut, Send, User, UploadCloud, Target, PlusCircle, Settings2 } from 'lucide-react';
 export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
 const API_BASE = "http://localhost:8000";
 const WS_BASE = "ws://localhost:8000";
 
