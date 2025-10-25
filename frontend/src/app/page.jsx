@@ -1020,4 +1020,4 @@ function SpendingByCategory({ data }) {
       )}
     </div>
   );
-}
+}// Force dynamic deployment
