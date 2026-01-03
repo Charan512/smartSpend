@@ -1,24 +1,69 @@
 import json
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect
+import logging
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 from typing import List
 from datetime import datetime
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from app import models, schemas, crud, database, nlp, ocr
 from app.database import engine, SessionLocal
 from app.websocket_manager import manager
+from app.exceptions import (
+    AppException, app_exception_handler, validation_exception_handler,
+    sqlalchemy_exception_handler, generic_exception_handler, ResourceNotFoundError
+)
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import asyncio  
 import os
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('app.log')
+    ]
+)
+logger = logging.getLogger(__name__)
+
 models.Base.metadata.create_all(bind=engine)
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(title="Smart Expense Tracker API")
 
+# Add rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Register exception handlers
+app.add_exception_handler(AppException, app_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(SQLAlchemyError, sqlalchemy_exception_handler)
+app.add_exception_handler(Exception, generic_exception_handler)
+
 # --- CORS ---
+# Support both production and local development
+allowed_origins = [
+    "https://smart-spend-j245.vercel.app",  # Production
+    "http://localhost:3000",  # Local development
+    "http://127.0.0.1:3000",  # Local development alternative
+]
+
+# Allow all origins in development mode
+if os.getenv("ENVIRONMENT") == "development":
+    allowed_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://smart-spend-j245.vercel.app"],  
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,15 +81,27 @@ def get_db():
 
 @app.get("/")
 def root():
-    return {"message": "Smart Expense Tracker API is running"}
+    return {"message": "Smart Expense Tracker API is running", "version": "1.0.0"}
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for monitoring and load balancers."""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "service": "Smart Expense Tracker API"
+    }
 
 # --- Auth ---
 @app.post("/register")
-def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")  # Prevent spam registrations
+def register(request: Request, user: schemas.UserCreate, db: Session = Depends(get_db)):
+    logger.info(f"Registration attempt for email: {user.email}")
     if crud.get_user_by_email(db, user.email):
         raise HTTPException(status_code=400, detail="Email already registered")
     new_user = crud.create_user(db, user.name, user.email, user.monthly_budget, user.password)
     crud.create_default_budgets(db, new_user.id, user.monthly_budget)
+    logger.info(f"User registered successfully: {new_user.id}")
     return {
         "user_id": new_user.id, 
         "email": new_user.email,
@@ -52,10 +109,14 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     }
 
 @app.post("/login")
-def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")  # Prevent brute force attacks
+def login(request: Request, user: schemas.UserLogin, db: Session = Depends(get_db)):
+    logger.info(f"Login attempt for email: {user.email}")
     db_user = crud.authenticate_user(db, email=user.email, password=user.password)
     if not db_user:
+        logger.warning(f"Failed login attempt for email: {user.email}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    logger.info(f"User logged in successfully: {db_user.id}")
     return {
         "user_id": db_user.id, 
         "email": db_user.email, 
@@ -114,11 +175,24 @@ async def websocket_chat(websocket: WebSocket, user_id: int):
         await manager.disconnect(user_id)
 
 # --- Uploads ---
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
 @app.post("/upload/receipt")
 async def upload_receipt(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    # Validate file size
     contents = await file.read()
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {MAX_FILE_SIZE / 1024 / 1024}MB")
+    
+    # Validate file type
+    if not file.content_type or not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="Only image files are allowed")
+    
     try:
         text = ocr.extract_text_from_bytes(contents)
+        if not text or not text.strip():
+            raise HTTPException(status_code=400, detail="Could not extract text from receipt. Please ensure the image is clear.")
+        
         parsed = nlp.parse_expense_from_text(text)
         if not parsed:
             raise HTTPException(status_code=400, detail="Could not extract expense details from receipt.")
@@ -129,13 +203,26 @@ async def upload_receipt(user_id: int, file: UploadFile = File(...), db: Session
             "merchant": expense.merchant,
             "date": expense.date.isoformat() if expense.date else None
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error processing receipt: {str(e)}")
 
 @app.post("/upload/csv")
 async def upload_csv(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    # Validate file size
     contents = await file.read()
-    return crud.import_csv(db, user_id, contents)
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {MAX_FILE_SIZE / 1024 / 1024}MB")
+    
+    # Validate file type
+    if not file.filename or not (file.filename.endswith('.csv') or file.filename.endswith('.txt')):
+        raise HTTPException(status_code=400, detail="Only CSV or TXT files are allowed")
+    
+    try:
+        return crud.import_csv(db, user_id, contents)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error importing CSV: {str(e)}")
 
 # --- Expenses & Goals ---
 @app.post("/expense/quick", response_model=schemas.ExpenseOut)
@@ -186,8 +273,17 @@ async def check_budgets_and_goals():
     finally:
         db.close()
 
+# Only initialize scheduler in main process (not in worker processes)
+# In production with multiple workers, consider using a separate scheduler process
+# or a distributed task queue like Celery
 scheduler = AsyncIOScheduler()
-scheduler.add_job(check_budgets_and_goals, 'interval', hours=1)
+
+# Check if we should run the scheduler (only in main process)
+# This prevents duplicate jobs when using multiple Uvicorn workers
+should_run_scheduler = os.getenv("RUN_SCHEDULER", "true").lower() == "true"
+
+if should_run_scheduler:
+    scheduler.add_job(check_budgets_and_goals, 'interval', hours=1)
 
 # --- SINGLE startup_event function ---
 @app.on_event("startup")
@@ -199,8 +295,12 @@ async def startup_event():
     except Exception as e:
         print(f"spaCy model download error: {e}")
     
-    # Start scheduler
-    scheduler.start()
+    # Start scheduler only if enabled
+    if should_run_scheduler:
+        scheduler.start()
+        print("✅ Scheduler started")
+    else:
+        print("ℹ️ Scheduler disabled (RUN_SCHEDULER=false)")
     
     # Initialize categories
     db = SessionLocal()

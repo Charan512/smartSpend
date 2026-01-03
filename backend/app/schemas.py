@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr, constr
+from pydantic import BaseModel, Field, EmailStr, constr, field_validator
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
@@ -29,8 +29,15 @@ class UserOut(BaseModel):
 # Expense Schemas
 # -----------------------------
 class ExpenseIn(BaseModel):
-    user_id: int
-    text: str = Field(..., min_length=1)
+    user_id: int = Field(..., gt=0, description="User ID must be positive")
+    text: str = Field(..., min_length=1, max_length=500)
+    
+    @field_validator('user_id')
+    @classmethod
+    def validate_user_id(cls, v):
+        if v <= 0:
+            raise ValueError('user_id must be a positive integer')
+        return v
 
 
 class ExpenseOut(BaseModel):
@@ -47,21 +54,45 @@ class ExpenseOut(BaseModel):
 
 
 class ExpenseQuick(BaseModel):
-    user_id: int
-    amount: float = Field(..., gt=0)
-    category: str
-    description: Optional[str] = None
-    merchant: Optional[str] = None
+    user_id: int = Field(..., gt=0)
+    amount: float = Field(..., gt=0, le=100000, description="Amount must be between 0 and 100,000")
+    category: str = Field(..., min_length=1, max_length=50)
+    description: Optional[str] = Field(None, max_length=255)
+    merchant: Optional[str] = Field(None, max_length=100)
+    
+    @field_validator('category')
+    @classmethod
+    def validate_category(cls, v):
+        return v.strip()
+    
+    @field_validator('user_id')
+    @classmethod
+    def validate_user_id(cls, v):
+        if v <= 0:
+            raise ValueError('user_id must be a positive integer')
+        return v
 
 
 # -----------------------------
 # Goal Schemas
 # -----------------------------
 class GoalCreate(BaseModel):
-    user_id: int
-    category: str
-    target_amount: float = Field(..., ge=0)
+    user_id: int = Field(..., gt=0)
+    category: str = Field(..., min_length=1, max_length=50)
+    target_amount: float = Field(..., ge=0, le=1000000)
     period: constr(pattern="^(monthly|weekly)$")
+    
+    @field_validator('user_id')
+    @classmethod
+    def validate_user_id(cls, v):
+        if v <= 0:
+            raise ValueError('user_id must be a positive integer')
+        return v
+    
+    @field_validator('category')
+    @classmethod
+    def validate_category(cls, v):
+        return v.strip()
 
 
 class GoalOut(BaseModel):

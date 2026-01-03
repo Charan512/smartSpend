@@ -2,6 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom input styles */
+input,
+textarea {
+  caret-color: #3b82f6;
+  color: black;
+}
+
+/* Ensure text is visible in inputs */
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

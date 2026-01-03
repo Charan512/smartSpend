@@ -27,19 +27,19 @@ DEFAULT_CATEGORY_PERCENTAGES = {
 # -----------------------------
 # Password helpers
 # -----------------------------
-def get_password_hash(password: bytes) -> str:
+def get_password_hash(password: str) -> str:
+    """Hash a password using bcrypt. Bcrypt automatically handles truncation at 72 bytes."""
     return pwd_context.hash(password)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    truncated_password = plain_password[:72].encode('utf-8')
-    return pwd_context.verify(truncated_password, hashed_password)
+    """Verify a password against its hash. Bcrypt handles truncation automatically."""
+    return pwd_context.verify(plain_password, hashed_password)
 
 # -----------------------------
 # User CRUD
 # -----------------------------
 def create_user(db: Session, name: str, email: str, monthly_budget: float, password: str):
-    truncated_password = password[:72].encode('utf-8')
-    hashed_password = get_password_hash(truncated_password)
+    hashed_password = get_password_hash(password)
     db_user = User(
         name=name, email=email, monthly_budget=monthly_budget, password=hashed_password
     )
@@ -90,31 +90,8 @@ def list_expenses(db: Session, user_id: int):
 # -----------------------------
 # Summaries
 # -----------------------------
-def get_monthly_summary(db: Session, user_id: int):
-    now = datetime.now()
-    start = datetime(now.year, now.month, 1)
-    end = datetime(now.year, now.month + 1, 1) if now.month < 12 else datetime(now.year + 1, 1, 1)
+# Note: get_monthly_summary is defined later (line 512) with enhanced functionality
 
-    expenses = db.query(Expense.category, func.sum(Expense.amount))\
-                 .filter(Expense.user_id == user_id, Expense.date >= start, Expense.date < end)\
-                 .group_by(Expense.category).all()
-
-    total = sum([amt for _, amt in expenses])
-    
-    # Get user's monthly budget
-    user_budget = get_user_monthly_budget(db, user_id)
-    remaining_budget = user_budget - total
-    budget_usage_percent = (total / user_budget * 100) if user_budget > 0 else 0
-    
-    summary = {
-        "total": total, 
-        "categories": {cat: amt for cat, amt in expenses},
-        "monthly_budget": user_budget,
-        "remaining_budget": remaining_budget,
-        "budget_usage_percent": round(budget_usage_percent, 2),
-        "is_over_budget": remaining_budget < 0
-    }
-    return summary
 def get_total_expenses(db: Session, user_id: int, category_name: str, start_date: datetime, end_date: datetime):
     return db.query(func.sum(Expense.amount)).filter(
         Expense.user_id == user_id,

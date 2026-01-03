@@ -3,9 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ArrowUpRight, Bot, FileUp, LogOut, Send, User, UploadCloud, Target, PlusCircle, Settings2 } from 'lucide-react';
-
-const API_BASE = "https://smartspent.onrender.com";
-const WS_BASE = "wss://smartspent.onrender.com";
+import { API_BASE, WS_BASE } from '../lib/config';
 
 export default function DashboardPage() {
   const [userId, setUserId] = useState(null);
@@ -96,7 +94,6 @@ function AuthPanel({ onAuth }) {
 
   return (
     <div className="p-8 bg-white rounded-xl shadow-lg max-w-md w-full border border-gray-200">
-      <style>{` input { caret-color: #3b82f6; color: black; } `}</style>
       <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
         {mode === "login" ? "Welcome Back" : "Create Your Account"}
       </h2>
@@ -104,59 +101,59 @@ function AuthPanel({ onAuth }) {
         {mode === "register" && (
           <>
             <div>
-              <input 
-                type="text" 
-                placeholder="Name" 
-                className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
-                required 
+              <input
+                type="text"
+                placeholder="Name"
+                className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
               />
             </div>
             <div>
-              <input 
-                type="number" 
-                placeholder="Monthly Budget (e.g., 40000)" 
+              <input
+                type="number"
+                placeholder="Monthly Budget (e.g., 40000)"
                 min="1"
-                className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                value={budget} 
-                onChange={(e) => setBudget(e.target.value)} 
-                required 
+                className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                required
               />
             </div>
           </>
         )}
         <div>
-          <input 
-            type="email" 
-            placeholder="Email" 
-            className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-            value={email} 
-            onChange={(e) => setEmail(e.target.value)} 
-            required 
+          <input
+            type="email"
+            placeholder="Email"
+            className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
           />
         </div>
         <div>
-          <input 
-            type="password" 
-            placeholder="Password" 
-            className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-            value={password} 
-            onChange={(e) => setPassword(e.target.value)} 
-            required 
+          <input
+            type="password"
+            placeholder="Password"
+            className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
           />
         </div>
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           disabled={loading}
           className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:bg-blue-400 disabled:cursor-not-allowed"
         >
           {loading ? "Processing..." : mode === "login" ? "Login" : "Register"}
         </button>
       </form>
-      <p 
-        onClick={() => { if (!loading) setMode(mode === "login" ? "register" : "login"); }} 
+      <p
+        onClick={() => { if (!loading) setMode(mode === "login" ? "register" : "login"); }}
         className={`mt-6 text-sm text-blue-600 text-center cursor-pointer hover:underline ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
         {mode === "login" ? "New here? Create an account" : "Already have an account? Login"}
@@ -172,7 +169,7 @@ function DashboardLayout({ userId, onLogout }) {
 
   const fetchData = useCallback(async () => {
     if (!userId) return;
-    
+
     try {
       setLoading(true);
       const [summaryRes, forecastRes] = await Promise.all([
@@ -187,7 +184,7 @@ function DashboardLayout({ userId, onLogout }) {
       setLoading(false);
     }
   }, [userId]);
-  
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -202,20 +199,14 @@ function DashboardLayout({ userId, onLogout }) {
 
   return (
     <>
-      <style>{`
-        input, textarea { 
-          caret-color: #3b82f6; 
-          color: black;
-        }
-      `}</style>
       <div className="bg-gray-50 min-h-screen p-4 sm:p-6 lg:p-8">
         <header className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Expense Dashboard</h1>
             <p className="text-gray-600">Your financial overview for the month.</p>
           </div>
-          <button 
-            onClick={onLogout} 
+          <button
+            onClick={onLogout}
             className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-red-600 bg-white px-4 py-2 rounded-lg border shadow-sm transition-colors"
           >
             <LogOut size={16} /> Logout
@@ -258,19 +249,46 @@ function SmartChat({ userId, onNewExpense }) {
     onNewExpenseRef.current = onNewExpense;
   }, [onNewExpense]);
 
-  useEffect(() => {
+  // WebSocket reconnection logic
+  const reconnectTimeoutRef = useRef(null);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 5;
+  const baseReconnectDelay = 1000; // 1 second
+
+  const connectWebSocket = useCallback(() => {
     if (!userId) return;
 
     console.log("Starting WebSocket connection...");
-    ws.current = new WebSocket(`${WS_BASE}/ws/chat/${userId}`);
-    const socket = ws.current;
-    
-    socket.onopen = () => setStatus("Connected");
-    socket.onclose = () => setStatus("Disconnected");
+    const socket = new WebSocket(`${WS_BASE}/ws/chat/${userId}`);
+    ws.current = socket;
+
+    socket.onopen = () => {
+      setStatus("Connected");
+      reconnectAttemptsRef.current = 0; // Reset reconnect attempts on successful connection
+    };
+
+    socket.onclose = () => {
+      setStatus("Disconnected");
+
+      // Attempt to reconnect with exponential backoff
+      if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+        const delay = baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
+        setStatus(`Reconnecting in ${delay / 1000}s...`);
+
+        reconnectTimeoutRef.current = setTimeout(() => {
+          reconnectAttemptsRef.current += 1;
+          console.log(`Reconnection attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts}`);
+          connectWebSocket();
+        }, delay);
+      } else {
+        setStatus("Connection failed. Please reload the page.");
+      }
+    };
+
     socket.onerror = (err) => {
-        console.error("WebSocket error:", err);
-        setStatus("Connection failed - will retry");
-      };
+      console.error("WebSocket error:", err);
+      setStatus("Connection error");
+    };
 
     socket.onmessage = (event) => {
       try {
@@ -282,20 +300,20 @@ function SmartChat({ userId, onNewExpense }) {
           setMessages(prev => [...prev, { sender: 'bot', text: event.data }]);
           return;
         }
-        
+
         if (data.type === "history") {
           const historyMessages = data.data.map(item => [
             { sender: 'user', text: item.message },
             { sender: 'bot', text: item.response }
           ]).flat();
           setMessages(historyMessages.reverse());
-        } 
+        }
         else if (data.type === "update") {
           setMessages(prev => [...prev, { sender: 'bot', text: data.data }]);
           if (data.is_expense) {
             onNewExpenseRef.current();
           }
-        } 
+        }
         else if (data.type === "error") {
           setMessages(prev => [...prev, { sender: 'bot', text: `Error: ${data.data}` }]);
         }
@@ -305,13 +323,24 @@ function SmartChat({ userId, onNewExpense }) {
       }
     };
 
+    return socket;
+  }, [userId]);
+
+  useEffect(() => {
+    const socket = connectWebSocket();
+
     return () => {
+      // Clear reconnection timeout on cleanup
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+
       if (socket && socket.readyState === WebSocket.OPEN) {
         socket.close();
       }
     };
-  }, [userId]);
-  
+  }, [connectWebSocket]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -336,10 +365,9 @@ function SmartChat({ userId, onNewExpense }) {
       <div className="p-4 border-b">
         <h3 className="font-bold text-lg text-gray-900">Smart Expense Chat</h3>
         <div className="mt-1 text-xs font-medium flex items-center gap-2">
-          <span className={`h-2 w-2 rounded-full ${
-            status === 'Connected' ? 'bg-green-500 animate-pulse' : 
+          <span className={`h-2 w-2 rounded-full ${status === 'Connected' ? 'bg-green-500 animate-pulse' :
             status === 'Connecting...' ? 'bg-yellow-500' : 'bg-red-500'
-          }`}></span>
+            }`}></span>
           {status}
         </div>
       </div>
@@ -353,17 +381,16 @@ function SmartChat({ userId, onNewExpense }) {
             <div key={index} className={`flex items-start gap-3 my-4 ${msg.sender === 'user' ? 'justify-end' : ''}`}>
               {msg.sender === 'bot' && (
                 <div className="bg-gray-200 p-2 rounded-full" aria-label="AI Assistant">
-                  <Bot size={18} className="text-gray-600"/>
+                  <Bot size={18} className="text-gray-600" />
                 </div>
               )}
-              <div className={`max-w-xs px-4 py-2 rounded-lg shadow-sm ${
-                msg.sender === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-gray-100 text-gray-800 rounded-bl-none'
-              }`}>
+              <div className={`max-w-xs px-4 py-2 rounded-lg shadow-sm ${msg.sender === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-gray-100 text-gray-800 rounded-bl-none'
+                }`}>
                 {msg.text}
               </div>
               {msg.sender === 'user' && (
                 <div className="bg-gray-200 p-2 rounded-full" aria-label="You">
-                  <User size={18} className="text-gray-600"/>
+                  <User size={18} className="text-gray-600" />
                 </div>
               )}
             </div>
@@ -372,13 +399,13 @@ function SmartChat({ userId, onNewExpense }) {
         {loading && (
           <div className="flex items-start gap-3 my-4">
             <div className="bg-gray-200 p-2 rounded-full">
-              <Bot size={18} className="text-gray-600"/>
+              <Bot size={18} className="text-gray-600" />
             </div>
             <div className="bg-gray-100 text-gray-800 rounded-lg rounded-bl-none px-4 py-2">
               <div className="flex space-x-1">
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
             </div>
           </div>
@@ -386,16 +413,16 @@ function SmartChat({ userId, onNewExpense }) {
         <div ref={messagesEndRef} />
       </div>
       <form onSubmit={sendMessage} className="p-4 border-t flex items-center gap-2">
-        <input 
-          type="text" 
-          value={input} 
+        <input
+          type="text"
+          value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="e.g., spent 500 on groceries" 
-          className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1" 
+          placeholder="e.g., spent 500 on groceries"
+          className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1"
           disabled={loading}
         />
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           disabled={!input.trim() || loading}
           className="bg-blue-600 text-white p-2.5 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
@@ -460,17 +487,17 @@ function ReceiptUploader({ userId, onUploadSuccess }) {
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
       <h3 className="font-bold text-violet-600 mb-4 flex items-center gap-2">
-        <UploadCloud size={20} aria-label="Upload icon"/> Receipt Uploader
+        <UploadCloud size={20} aria-label="Upload icon" /> Receipt Uploader
       </h3>
-      <div 
+      <div
         className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-50 transition-colors"
         onClick={() => !isUploading && inputRef.current?.click()}
       >
-        <input 
-          ref={inputRef} 
-          type="file" 
-          accept="image/*" 
-          className="hidden" 
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
           onChange={handleFileChange}
           disabled={isUploading}
         />
@@ -482,8 +509,8 @@ function ReceiptUploader({ userId, onUploadSuccess }) {
           </p>
         )}
       </div>
-      <button 
-        onClick={handleUpload} 
+      <button
+        onClick={handleUpload}
         disabled={!file || isUploading}
         className="w-full mt-4 bg-violet-600 text-white py-2.5 rounded-lg hover:bg-violet-700 transition-colors font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
       >
@@ -502,22 +529,21 @@ function SummaryCards({ summary }) {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
-      <Card title="Total Spent (This Month)" value={`₹${spent.toFixed(2)}`} icon={<ArrowUpRight className="text-red-500" aria-label="Spent icon"/>} />
+      <Card title="Total Spent (This Month)" value={`₹${spent.toFixed(2)}`} icon={<ArrowUpRight className="text-red-500" aria-label="Spent icon" />} />
       <Card title="Monthly Budget" value={`₹${budget.toFixed(2)}`} />
-      <Card 
-        title="Remaining" 
-        value={`₹${remaining.toFixed(2)}`} 
-        color={remaining < 0 ? 'text-red-500' : 'text-green-600'} 
+      <Card
+        title="Remaining"
+        value={`₹${remaining.toFixed(2)}`}
+        color={remaining < 0 ? 'text-red-500' : 'text-green-600'}
       />
       <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
         <h4 className="text-sm font-medium text-gray-500 mb-2">Budget Usage</h4>
         <div className="text-3xl font-bold text-gray-900">{usagePercent.toFixed(1)}%</div>
         <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-          <div 
-            className={`h-2 rounded-full transition-all duration-300 ${
-              usagePercent > 90 ? 'bg-red-500' : 
+          <div
+            className={`h-2 rounded-full transition-all duration-300 ${usagePercent > 90 ? 'bg-red-500' :
               usagePercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
-            }`}
+              }`}
             style={{ width: `${Math.min(usagePercent, 100)}%` }}
           ></div>
         </div>
@@ -541,7 +567,7 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ff4d4d'
 
 function ExpenseForecast({ data }) {
   const chartData = [...(data.history || []), ...(data.forecast || [])];
-  
+
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 h-80">
       <h3 className="font-bold text-yellow-600 mb-4">Expense Forecast</h3>
@@ -551,10 +577,10 @@ function ExpenseForecast({ data }) {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="date" />
             <YAxis />
-            <Tooltip formatter={(value) => `₹${value?.toFixed(2) || '0.00'}`}/>
+            <Tooltip formatter={(value) => `₹${value?.toFixed(2) || '0.00'}`} />
             <Legend />
             <Line type="monotone" dataKey="amount" name="History" stroke="#8884d8" strokeWidth={2} />
-            <Line type="monotone" dataKey="predicted" name="Forecast" stroke="#82ca9d" strokeWidth={2} strokeDasharray="5 5"/>
+            <Line type="monotone" dataKey="predicted" name="Forecast" stroke="#82ca9d" strokeWidth={2} strokeDasharray="5 5" />
           </LineChart>
         </ResponsiveContainer>
       ) : (
@@ -573,22 +599,22 @@ function ImportCSV({ userId, onImport }) {
 
   const handleUpload = async () => {
     if (!file) return;
-    
+
     setLoading(true);
     const formData = new FormData();
     formData.append("file", file);
-    
+
     try {
       await axios.post(`${API_BASE}/upload/csv?user_id=${userId}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-      alert("CSV imported successfully!"); 
+      alert("CSV imported successfully!");
       onImport();
       setFile(null);
     } catch (error) {
-      console.error("CSV import failed:", error); 
+      console.error("CSV import failed:", error);
       alert("CSV import failed. Please check the file format.");
     } finally {
       setLoading(false);
@@ -598,18 +624,18 @@ function ImportCSV({ userId, onImport }) {
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
       <h3 className="font-bold text-orange-600 mb-4 flex items-center gap-2">
-        <FileUp size={20} aria-label="File upload icon"/> Import from CSV
+        <FileUp size={20} aria-label="File upload icon" /> Import from CSV
       </h3>
       <div className="flex items-center gap-4">
-        <input 
-          type="file" 
-          accept=".csv,.txt" 
-          onChange={(e) => setFile(e.target.files[0])} 
-          className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
+        <input
+          type="file"
+          accept=".csv,.txt"
+          onChange={(e) => setFile(e.target.files[0])}
+          className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
           disabled={loading}
         />
-        <button 
-          onClick={handleUpload} 
+        <button
+          onClick={handleUpload}
           disabled={!file || loading}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
         >
@@ -631,7 +657,7 @@ function QuickExpenseForm({ userId, onSave }) {
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    
+
     if (!form.amount || !form.category) {
       setError("Amount and category are required");
       return;
@@ -644,15 +670,15 @@ function QuickExpenseForm({ userId, onSave }) {
 
     setLoading(true);
     try {
-      await axios.post(`${API_BASE}/expense/quick`, { 
-        user_id: userId, 
-        ...form, 
-        amount: parseFloat(form.amount) 
+      await axios.post(`${API_BASE}/expense/quick`, {
+        user_id: userId,
+        ...form,
+        amount: parseFloat(form.amount)
       });
       setForm({ amount: "", category: "", description: "", merchant: "" });
       onSave();
-    } catch (err) { 
-      console.error("Failed to save expense:", err); 
+    } catch (err) {
+      console.error("Failed to save expense:", err);
       setError("Failed to save expense. Please try again.");
     } finally {
       setLoading(false);
@@ -662,46 +688,46 @@ function QuickExpenseForm({ userId, onSave }) {
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
       <h3 className="font-bold text-blue-600 mb-4 flex items-center gap-2">
-        <PlusCircle size={20} aria-label="Add expense icon"/> Quick Add Expense
+        <PlusCircle size={20} aria-label="Add expense icon" /> Quick Add Expense
       </h3>
       <form onSubmit={handleFormSubmit} className="space-y-3">
         <div className="flex gap-3">
-          <input 
-            type="number" 
-            placeholder="Amount *" 
-            value={form.amount} 
-            onChange={(e) => setForm({ ...form, amount: e.target.value })} 
-            className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-            required 
+          <input
+            type="number"
+            placeholder="Amount *"
+            value={form.amount}
+            onChange={(e) => setForm({ ...form, amount: e.target.value })}
+            className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
             min="0.01"
             step="0.01"
           />
-          <input 
-            type="text" 
-            placeholder="Category *" 
-            value={form.category} 
-            onChange={(e) => setForm({ ...form, category: e.target.value })} 
-            className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-            required 
+          <input
+            type="text"
+            placeholder="Category *"
+            value={form.category}
+            onChange={(e) => setForm({ ...form, category: e.target.value })}
+            className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
           />
         </div>
-        <input 
-          type="text" 
-          placeholder="Merchant (optional)" 
-          value={form.merchant} 
-          onChange={(e) => setForm({ ...form, merchant: e.target.value })} 
-          className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+        <input
+          type="text"
+          placeholder="Merchant (optional)"
+          value={form.merchant}
+          onChange={(e) => setForm({ ...form, merchant: e.target.value })}
+          className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <input 
-          type="text" 
-          placeholder="Description (optional)" 
-          value={form.description} 
-          onChange={(e) => setForm({ ...form, description: e.target.value })} 
-          className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+        <input
+          type="text"
+          placeholder="Description (optional)"
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         {error && <p className="text-red-500 text-sm">{error}</p>}
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           disabled={loading}
           className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition font-semibold disabled:bg-blue-400 disabled:cursor-not-allowed"
         >
@@ -720,7 +746,7 @@ function GoalForm({ userId, onSave }) {
   const handleGoalSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    
+
     if (!goalForm.category || !goalForm.target_amount) {
       setError("Category and target amount are required");
       return;
@@ -733,15 +759,15 @@ function GoalForm({ userId, onSave }) {
 
     setLoading(true);
     try {
-      await axios.post(`${API_BASE}/goals`, { 
-        user_id: userId, 
-        ...goalForm, 
-        target_amount: Number(goalForm.target_amount) 
+      await axios.post(`${API_BASE}/goals`, {
+        user_id: userId,
+        ...goalForm,
+        target_amount: Number(goalForm.target_amount)
       });
       setGoalForm({ category: "", target_amount: "", period: "monthly" });
       onSave();
-    } catch (err) { 
-      console.error("Failed to save goal:", err); 
+    } catch (err) {
+      console.error("Failed to save goal:", err);
       setError("Failed to save goal. Please try again.");
     } finally {
       setLoading(false);
@@ -751,31 +777,31 @@ function GoalForm({ userId, onSave }) {
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
       <h3 className="font-bold text-green-600 mb-4 flex items-center gap-2">
-        <Target size={20} aria-label="Target icon"/> Set Budget Goal
+        <Target size={20} aria-label="Target icon" /> Set Budget Goal
       </h3>
       <form onSubmit={handleGoalSubmit} className="space-y-3">
         <div className="flex gap-3">
-          <input 
-            type="text" 
-            placeholder="Category *" 
-            value={goalForm.category} 
-            onChange={(e) => setGoalForm({ ...goalForm, category: e.target.value })} 
-            className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
-            required 
+          <input
+            type="text"
+            placeholder="Category *"
+            value={goalForm.category}
+            onChange={(e) => setGoalForm({ ...goalForm, category: e.target.value })}
+            className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+            required
           />
-          <input 
-            type="number" 
-            placeholder="Target Amount *" 
-            value={goalForm.target_amount} 
-            onChange={(e) => setGoalForm({ ...goalForm, target_amount: e.target.value })} 
-            className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500" 
-            required 
+          <input
+            type="number"
+            placeholder="Target Amount *"
+            value={goalForm.target_amount}
+            onChange={(e) => setGoalForm({ ...goalForm, target_amount: e.target.value })}
+            className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+            required
             min="0.01"
             step="0.01"
           />
         </div>
-        <select 
-          value={goalForm.period} 
+        <select
+          value={goalForm.period}
           onChange={(e) => setGoalForm({ ...goalForm, period: e.target.value })}
           className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
         >
@@ -783,8 +809,8 @@ function GoalForm({ userId, onSave }) {
           <option value="weekly">Weekly</option>
         </select>
         {error && <p className="text-red-500 text-sm">{error}</p>}
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           disabled={loading}
           className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition font-semibold disabled:bg-green-400 disabled:cursor-not-allowed"
         >
@@ -801,42 +827,42 @@ function BudgetOptimizer({ userId }) {
   const [error, setError] = useState("");
 
   const runOptimizer = async () => {
-    setLoading(true); 
+    setLoading(true);
     setData(null);
     setError("");
-    
+
     try {
       const res = await axios.get(`${API_BASE}/budget/optimize/${userId}`);
       setData(res.data);
-    } catch (err) { 
-      console.error("Optimizer failed:", err); 
+    } catch (err) {
+      console.error("Optimizer failed:", err);
       setError("Failed to run optimizer. Please try again.");
-    } finally { 
-      setLoading(false); 
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
       <h3 className="font-bold text-violet-700 mb-4 flex items-center gap-2">
-        <Settings2 size={20} aria-label="Settings icon"/> Smart Budget Optimizer
+        <Settings2 size={20} aria-label="Settings icon" /> Smart Budget Optimizer
       </h3>
       <p className="text-sm text-gray-600 mb-4">Analyze your spending and get suggestions to reallocate your budget.</p>
-      
-      <button 
-        onClick={runOptimizer} 
+
+      <button
+        onClick={runOptimizer}
         disabled={loading}
         className="bg-purple-600 text-white px-5 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold transition-colors"
       >
         {loading ? "Analyzing..." : "Run Optimizer"}
       </button>
-      
+
       {error && (
         <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-red-700 text-sm">{error}</p>
         </div>
       )}
-      
+
       {data && (
         <div className="mt-4 border-t pt-4">
           <h4 className="font-semibold text-gray-800 mb-2">Optimization Summary:</h4>
@@ -856,10 +882,10 @@ function SpendingByCategory({ data }) {
   const [monthlyData, setMonthlyData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  
-  const chartData = Object.entries(data || {}).map(([name, value]) => ({ 
-    name, 
-    value: parseFloat(value) 
+
+  const chartData = Object.entries(data || {}).map(([name, value]) => ({
+    name,
+    value: parseFloat(value)
   }));
 
   const fetchMonthlyData = async () => {
@@ -889,26 +915,26 @@ function SpendingByCategory({ data }) {
     <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 h-80">
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-bold text-red-600">Spending by Category</h3>
-        <button 
+        <button
           onClick={handleOpenModal}
           className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
         >
           View All Months →
         </button>
       </div>
-      
+
       {chartData.length > 0 ? (
         <ResponsiveContainer width="100%" height="90%">
           <PieChart>
-            <Pie 
-              data={chartData} 
-              dataKey="value" 
-              nameKey="name" 
-              cx="50%" 
-              cy="50%" 
-              outerRadius={80} 
-              fill="#8884d8" 
-              labelLine={false} 
+            <Pie
+              data={chartData}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              outerRadius={80}
+              fill="#8884d8"
+              labelLine={false}
               label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
             >
               {chartData.map((entry, index) => (
@@ -924,19 +950,19 @@ function SpendingByCategory({ data }) {
           <p className="text-sm mt-1">Add expenses to see your spending breakdown</p>
         </div>
       )}
-      
+
       {showAllMonths && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
           onClick={() => setShowAllMonths(false)}
         >
-          <div 
+          <div
             className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center p-6 border-b">
               <h3 className="text-xl font-bold text-gray-800">Monthly Spending Overview</h3>
-              <button 
+              <button
                 onClick={() => setShowAllMonths(false)}
                 className="text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors"
                 aria-label="Close modal"
@@ -944,7 +970,7 @@ function SpendingByCategory({ data }) {
                 ×
               </button>
             </div>
-            
+
             <div className="p-6 overflow-y-auto max-h-[70vh]">
               {loading ? (
                 <div className="text-center py-8">
@@ -957,11 +983,11 @@ function SpendingByCategory({ data }) {
               ) : monthlyData.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                   {monthlyData.map((month) => {
-                    const monthChartData = Object.entries(month.categories || {}).map(([name, value]) => ({ 
-                      name, 
-                      value: parseFloat(value) 
+                    const monthChartData = Object.entries(month.categories || {}).map(([name, value]) => ({
+                      name,
+                      value: parseFloat(value)
                     }));
-                    
+
                     return (
                       <div key={`${month.year}-${month.month}`} className="text-center border rounded-lg p-4 bg-gray-50">
                         <h4 className="font-semibold text-gray-700 mb-2">
@@ -1009,7 +1035,7 @@ function SpendingByCategory({ data }) {
                 </div>
               )}
             </div>
-            
+
             <div className="p-4 border-t bg-gray-50 text-center">
               <p className="text-sm text-gray-600">
                 {monthlyData.length} month{monthlyData.length !== 1 ? 's' : ''} with data • Click outside to close

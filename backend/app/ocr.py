@@ -53,8 +53,7 @@ def extract_text_from_bytes(file_bytes: bytes) -> str:
         return text
     except Exception as e:
         print(f"OCR Error: {e}")
-        # Fallback for testing
-        return "Coffee 250.00 at Starbucks"
+        raise Exception(f"Failed to extract text from image: {str(e)}")
 
 # Test Tesseract on startup
 try:
