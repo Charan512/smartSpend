@@ -10,9 +10,9 @@ venv/
 .env
 
 # Model files
-!backend/models/*.pkl
 *.pkl
 *.h5
+!backend/models/*.pkl
 
 # Node.js
 node_modules/
