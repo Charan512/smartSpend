@@ -26,7 +26,7 @@ class MonthlySummary(Base):
     category_data = Column(String) 
     created_at = Column(DateTime, server_default=func.now())
     
-    user = relationship("User")
+    user = relationship("User", back_populates="monthly_summaries")
 class Expense(Base):
     __tablename__ = "expenses"
     id = Column(Integer, primary_key=True, index=True)

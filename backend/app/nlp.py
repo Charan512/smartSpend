@@ -71,6 +71,16 @@ def process_chat_message(db: Session, user_id: int, text: str):
             
         return response_msg, False
 
+    # Default: unrecognized intent
+    return (
+        "I didn't quite catch that 🤔\n"
+        "Try something like:\n"
+        "• 'Spent ₹500 on groceries'\n"
+        "• 'Paid ₹200 for Uber'\n"
+        "• 'Show my budget summary'",
+        False
+    )
+
 
 def parse_expense_from_text(text: str):
     """Extracts amount, category, date, and merchant from a text string."""

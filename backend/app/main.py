@@ -1,5 +1,6 @@
 import json
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -20,8 +21,7 @@ from app.exceptions import (
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import asyncio  
 import os
-
-# Configure logging
+from app import auth
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -37,7 +37,53 @@ models.Base.metadata.create_all(bind=engine)
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
-app = FastAPI(title="Smart Expense Tracker API")
+scheduler = AsyncIOScheduler()
+should_run_scheduler = os.getenv("RUN_SCHEDULER", "true").lower() == "true"
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handles startup and shutdown logic."""
+    # --- Startup ---
+    try:
+        from download_models import download_spacy_model
+        download_spacy_model()
+    except Exception as e:
+        print(f"spaCy model download error: {e}")
+
+    if should_run_scheduler:
+        scheduler.add_job(check_budgets_and_goals, 'interval', hours=1)
+        scheduler.start()
+        print("✅ Scheduler started")
+    else:
+        print("ℹ️ Scheduler disabled (RUN_SCHEDULER=false)")
+
+    db = SessionLocal()
+    try:
+        if not crud.get_categories(db):
+            defaults = [
+                ("Food", "food,restaurant,dinner,coffee"),
+                ("Shopping", "shop,clothes,amazon,store"),
+                ("Transport", "bus,train,taxi,uber"),
+                ("Bills", "electricity,water,gas,internet"),
+                ("Entertainment", "movie,netflix,game,concert"),
+                ("Other", ""),
+            ]
+            for name, keywords in defaults:
+                crud.create_category(db, name, keywords)
+            print("✅ Default categories initialized")
+    except Exception as e:
+        print(f"Startup error: {e}")
+    finally:
+        db.close()
+
+    yield  # App runs here
+
+    # --- Shutdown ---
+    if should_run_scheduler and scheduler.running:
+        scheduler.shutdown()
+        print("✅ Scheduler shut down")
+
+app = FastAPI(title="Smart Expense Tracker API", lifespan=lifespan)
 
 # Add rate limiting
 app.state.limiter = limiter
@@ -50,16 +96,17 @@ app.add_exception_handler(SQLAlchemyError, sqlalchemy_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
 # --- CORS ---
-# Support both production and local development
-allowed_origins = [
-    "https://smart-spend-j245.vercel.app",  # Production
-    "http://localhost:3000",  # Local development
-    "http://127.0.0.1:3000",  # Local development alternative
-]
+env_origins = os.getenv("CORS_ORIGINS")
+is_prod = os.getenv("ENVIRONMENT") == "production"
 
-# Allow all origins in development mode
-if os.getenv("ENVIRONMENT") == "development":
+if env_origins:
+    allowed_origins = [origin.strip() for origin in env_origins.split(",")]
+elif not is_prod:
+    # In development, we can be lax if no CORS_ORIGINS is set
     allowed_origins = ["*"]
+else:
+    # In production, we MUST have specific origins defined
+    raise RuntimeError("CORS_ORIGINS environment variable is REQUIRED in production mode!")
 
 app.add_middleware(
     CORSMiddleware,
@@ -102,10 +149,15 @@ def register(request: Request, user: schemas.UserCreate, db: Session = Depends(g
     new_user = crud.create_user(db, user.name, user.email, user.monthly_budget, user.password)
     crud.create_default_budgets(db, new_user.id, user.monthly_budget)
     logger.info(f"User registered successfully: {new_user.id}")
+    
+    access_token = auth.create_access_token(data={"sub": str(new_user.id)})
+    
     return {
         "user_id": new_user.id, 
         "email": new_user.email,
-        "monthly_budget": new_user.monthly_budget
+        "monthly_budget": new_user.monthly_budget,
+        "access_token": access_token,
+        "token_type": "bearer"
     }
 
 @app.post("/login")
@@ -117,19 +169,41 @@ def login(request: Request, user: schemas.UserLogin, db: Session = Depends(get_d
         logger.warning(f"Failed login attempt for email: {user.email}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     logger.info(f"User logged in successfully: {db_user.id}")
+    
+    access_token = auth.create_access_token(data={"sub": str(db_user.id)})
+    
     return {
         "user_id": db_user.id, 
         "email": db_user.email, 
-        "monthly_budget": db_user.monthly_budget
+        "monthly_budget": db_user.monthly_budget,
+        "access_token": access_token,
+        "token_type": "bearer"
     }
 
 @app.websocket("/ws/chat/{user_id}")
-async def websocket_chat(websocket: WebSocket, user_id: int):
-    await manager.connect(user_id, websocket)
-    
+async def websocket_chat(websocket: WebSocket, user_id: int, token: str = None):
+    # Validate token manually since Depends doesn't work perfectly with websockets
     db = None
     try:
         db = SessionLocal()
+        if not token:
+            await websocket.close(code=1008)
+            return
+            
+        import jwt
+        from app.auth import SECRET_KEY, ALGORITHM
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            token_user_id = payload.get("sub")
+            if token_user_id is None or int(token_user_id) != user_id:
+                await websocket.close(code=1008)
+                return
+        except jwt.PyJWTError:
+            await websocket.close(code=1008)
+            return
+            
+        await manager.connect(user_id, websocket)
+
         history = crud.get_chat_history(db, user_id, limit=5)
         history_data = []
         for h in history:
@@ -178,7 +252,9 @@ async def websocket_chat(websocket: WebSocket, user_id: int):
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
 @app.post("/upload/receipt")
-async def upload_receipt(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_receipt(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), current_user: schemas.UserOut = Depends(auth.get_current_user)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     # Validate file size
     contents = await file.read()
     if len(contents) > MAX_FILE_SIZE:
@@ -209,7 +285,9 @@ async def upload_receipt(user_id: int, file: UploadFile = File(...), db: Session
         raise HTTPException(status_code=500, detail=f"Error processing receipt: {str(e)}")
 
 @app.post("/upload/csv")
-async def upload_csv(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_csv(user_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), current_user: schemas.UserOut = Depends(auth.get_current_user)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     # Validate file size
     contents = await file.read()
     if len(contents) > MAX_FILE_SIZE:
@@ -225,31 +303,50 @@ async def upload_csv(user_id: int, file: UploadFile = File(...), db: Session = D
         raise HTTPException(status_code=500, detail=f"Error importing CSV: {str(e)}")
 
 # --- Expenses & Goals ---
+@app.get("/expenses/{user_id}", response_model=List[schemas.ExpenseOut])
+def list_expenses(user_id: int, db: Session = Depends(get_db), current_user: schemas.UserOut = Depends(auth.get_current_user)):
+    """Return all expenses for the authenticated user."""
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return crud.list_expenses(db, user_id)
+
 @app.post("/expense/quick", response_model=schemas.ExpenseOut)
-def quick_expense(expense: schemas.ExpenseQuick, db: Session = Depends(get_db)):
+def quick_expense(expense: schemas.ExpenseQuick, db: Session = Depends(get_db), current_user: schemas.UserOut = Depends(auth.get_current_user)):
+    if current_user.id != expense.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     return crud.add_expense_quick(db, expense)
 
 @app.post("/goals", response_model=schemas.GoalOut)
-def create_goal(goal: schemas.GoalCreate, db: Session = Depends(get_db)):
+def create_goal(goal: schemas.GoalCreate, db: Session = Depends(get_db), current_user: schemas.UserOut = Depends(auth.get_current_user)):
+    if current_user.id != goal.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     return crud.create_or_update_goal(db, goal)
 
 @app.get("/goals/{user_id}", response_model=List[schemas.GoalOut])
-def list_goals(user_id: int, db: Session = Depends(get_db)):
+def list_goals(user_id: int, db: Session = Depends(get_db), current_user: schemas.UserOut = Depends(auth.get_current_user)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     return crud.get_goals(db, user_id)
 
 @app.get("/monthly_summary/{user_id}")
-def get_monthly_summary_route(user_id: int, db: Session = Depends(get_db)):
+def get_monthly_summary_route(user_id: int, db: Session = Depends(get_db), current_user: schemas.UserOut = Depends(auth.get_current_user)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     try:
         return crud.get_monthly_summary(db, user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching monthly summary: {str(e)}")
 
 @app.get("/forecast_expenses/{user_id}")
-def forecast_expenses_route(user_id: int, months: int = 3, db: Session = Depends(get_db)):
+def forecast_expenses_route(user_id: int, months: int = 3, db: Session = Depends(get_db), current_user: schemas.UserOut = Depends(auth.get_current_user)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     return crud.forecast_expenses(db, user_id, months)
 
 @app.get("/budget/optimize/{user_id}")
-def budget_optimize(user_id: int, db: Session = Depends(get_db)):
+def budget_optimize(user_id: int, db: Session = Depends(get_db), current_user: schemas.UserOut = Depends(auth.get_current_user)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     return crud.optimize_budgets(db, user_id)
 
 # --- Scheduler for alerts ---
@@ -273,58 +370,13 @@ async def check_budgets_and_goals():
     finally:
         db.close()
 
-# Only initialize scheduler in main process (not in worker processes)
-# In production with multiple workers, consider using a separate scheduler process
-# or a distributed task queue like Celery
-scheduler = AsyncIOScheduler()
-
-# Check if we should run the scheduler (only in main process)
-# This prevents duplicate jobs when using multiple Uvicorn workers
-should_run_scheduler = os.getenv("RUN_SCHEDULER", "true").lower() == "true"
-
-if should_run_scheduler:
-    scheduler.add_job(check_budgets_and_goals, 'interval', hours=1)
-
-# --- SINGLE startup_event function ---
-@app.on_event("startup")
-async def startup_event():
-    # Download spaCy model if not present
-    try:
-        from download_models import download_spacy_model
-        download_spacy_model()
-    except Exception as e:
-        print(f"spaCy model download error: {e}")
-    
-    # Start scheduler only if enabled
-    if should_run_scheduler:
-        scheduler.start()
-        print("✅ Scheduler started")
-    else:
-        print("ℹ️ Scheduler disabled (RUN_SCHEDULER=false)")
-    
-    # Initialize categories
-    db = SessionLocal()
-    try:
-        if not crud.get_categories(db):
-            defaults = [
-                ("Food", "food,restaurant,dinner,coffee"),
-                ("Shopping", "shop,clothes,amazon,store"),
-                ("Transport", "bus,train,taxi,uber"),
-                ("Bills", "electricity,water,gas,internet"),
-                ("Entertainment", "movie,netflix,game,concert"),
-                ("Other", ""),
-            ]
-            for name, keywords in defaults:
-                crud.create_category(db, name, keywords)
-            print("✅ Default categories initialized")
-    except Exception as e:
-        print(f"Startup error: {e}")
-    finally:
-        db.close()
+# Scheduler and lifespan now handled in the lifespan context manager above
 
 # --- Monthly History ---
 @app.get("/monthly_history/{user_id}")
-def get_monthly_history(user_id: int, year: int = None, db: Session = Depends(get_db)):
+def get_monthly_history(user_id: int, year: int = None, db: Session = Depends(get_db), current_user: schemas.UserOut = Depends(auth.get_current_user)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     """Get all monthly summaries for a user"""
     try:
         summaries = crud.get_monthly_summaries(db, user_id, year)
@@ -345,7 +397,9 @@ def get_monthly_history(user_id: int, year: int = None, db: Session = Depends(ge
         raise HTTPException(status_code=500, detail=f"Error fetching monthly history: {str(e)}")
 
 @app.get("/monthly_data/{user_id}/{year}/{month}")
-def get_monthly_data(user_id: int, year: int, month: int, db: Session = Depends(get_db)):
+def get_monthly_data(user_id: int, year: int, month: int, db: Session = Depends(get_db), current_user: schemas.UserOut = Depends(auth.get_current_user)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     """Get specific month data"""
     try:
         summary = crud.get_monthly_summary_by_date(db, user_id, year, month)
@@ -370,6 +424,4 @@ def get_monthly_data(user_id: int, year: int, month: int, db: Session = Depends(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching monthly data: {str(e)}")
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    scheduler.shutdown()
+# Shutdown is now handled in the lifespan context manager

@@ -1,37 +1,34 @@
 import axios from "axios";
 import { API_BASE } from "./config";
 
-export const login = (email, password) =>
-  axios.post(`${API_BASE}/login`, { email, password });
+const api = axios.create({
+  baseURL: API_BASE,
+});
 
-export const registerUser = (payload) =>
-  axios.post(`${API_BASE}/register`, payload);
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
-export const uploadReceipt = (userId, file) => {
-  const form = new FormData();
-  form.append("file", file);
-  // backend expects user_id as query param
-  return axios.post(`${API_BASE}/upload/receipt?user_id=${userId}`, form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-};
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Clear storage and redirect to login if unauthorized
+      localStorage.removeItem("token");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("email");
+      localStorage.removeItem("monthly_budget");
+      window.location.href = "/";
+    }
+    return Promise.reject(error);
+  }
+);
 
-// -----------------------------
-// Goals API
-// -----------------------------
-export const getGoals = (userId) =>
-  axios.get(`${API_BASE}/goals/${userId}`);
-
-export const createGoal = (payload) =>
-  axios.post(`${API_BASE}/goals`, payload);
-
-// -----------------------------
-// CSV Import API
-// -----------------------------
-export const uploadCSV = (userId, file) => {
-  const form = new FormData();
-  form.append("file", file);
-  return axios.post(`${API_BASE}/upload/csv?user_id=${userId}`, form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-};
+export default api;

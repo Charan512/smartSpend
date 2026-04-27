@@ -1,5 +1,11 @@
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE || "http://127.0.0.1:8000";
-export const WS_BASE =
-  process.env.NEXT_PUBLIC_WS_BASE || "ws://127.0.0.1:8000";
+// API and WebSocket base URLs are loaded from environment variables.
+// These should be set in .env.local for local development.
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL;
+export const WS_BASE = process.env.NEXT_PUBLIC_WS_URL;
 
+if (!API_BASE || !WS_BASE) {
+  console.warn(
+    "Missing NEXT_PUBLIC_API_URL or NEXT_PUBLIC_WS_URL environment variables. " +
+    "Please ensure your .env.local file is configured."
+  );
+}

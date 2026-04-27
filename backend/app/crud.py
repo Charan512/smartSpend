@@ -20,9 +20,9 @@ from pandas.errors import OutOfBoundsDatetime
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 DEFAULT_CATEGORY_PERCENTAGES = {
-    "Food": 0.4, "Shopping": 0.2, "Transport": 0.1,
-    "Entertainment": 0.1, "Bills": 0.2, "Other": 0.1
-}
+    "Food": 0.35, "Shopping": 0.20, "Transport": 0.10,
+    "Entertainment": 0.10, "Bills": 0.20, "Other": 0.05
+}  # sums to exactly 1.0
 
 # -----------------------------
 # Password helpers
@@ -50,6 +50,9 @@ def create_user(db: Session, name: str, email: str, monthly_budget: float, passw
 
 def get_user_by_email(db: Session, email: str):
     return db.query(User).filter(User.email == email).first()
+
+def get_user_by_id(db: Session, user_id: int):
+    return db.query(User).filter(User.id == user_id).first()
 
 def authenticate_user(db: Session, email: str, password: str):
     user = get_user_by_email(db, email)
