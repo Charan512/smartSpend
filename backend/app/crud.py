@@ -5,8 +5,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
-from . import models
-from .nlp import detect_anomaly, predict_monthly_total
 from .models import Goal, Category, Budget, User, Expense, ChatHistory, MonthlySummary  
 from .schemas import GoalCreate, ExpenseQuick
 from dateutil import parser as date_parser
@@ -308,6 +306,7 @@ def create_default_budgets(db: Session, user_id: int, total_budget: float):
 # Anomaly check
 # -----------------------------
 def check_expense_anomaly(db: Session, user_id: int, category: str, amount: float):
+    from .nlp import detect_anomaly
     if detect_anomaly(db, user_id, category, amount):
         return f"⚠️ This ₹{amount:.2f} expense in {category} is unusually high compared to your recent history!"
     return ""

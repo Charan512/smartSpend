@@ -7,7 +7,6 @@ import spacy
 import joblib
 import pandas as pd
 
-from . import crud
 from . import models
 
 # ==============================
@@ -34,6 +33,7 @@ except Exception:
 # app/nlp.py
 
 def process_chat_message(db: Session, user_id: int, text: str):
+    from . import crud
     """The main 'brain' for handling user chat messages."""
     text_lower = text.lower()
 
@@ -200,6 +200,7 @@ def detect_anomaly(db: Session, user_id: int, category: str, amount: float):
 
 # --- Monthly spending prediction (using the existing crud function for consistency) ---
 def predict_monthly_total(db: Session, user_id: int):
+    from . import crud
     # This function now correctly points to the robust forecasting in crud.py
     forecast_data = crud.forecast_expenses(db, user_id, months_ahead=1)
     if forecast_data and forecast_data['forecast']:
