@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../lib/api";
-import { Target, RefreshCw } from "lucide-react";
+import { Target, RefreshCw, AlertTriangle, CheckCircle } from "lucide-react";
 
 export default function GoalsPanel({ userId, summary }) {
   const [goals, setGoals] = useState([]);
@@ -97,9 +97,13 @@ export default function GoalsPanel({ userId, summary }) {
                 </div>
                 <p className="text-xs">
                   {over > 0 ? (
-                    <span className="text-red-500 font-medium">🚨 ₹{over.toFixed(2)} over budget</span>
+                    <span className="text-red-500 font-medium flex items-center gap-1">
+                      <AlertTriangle size={12} className="shrink-0" /> ₹{over.toFixed(2)} over budget
+                    </span>
                   ) : (
-                    <span className="text-green-600">₹{remaining.toFixed(2)} remaining</span>
+                    <span className="text-green-600 flex items-center gap-1">
+                      <CheckCircle size={12} className="shrink-0" /> ₹{remaining.toFixed(2)} remaining
+                    </span>
                   )}
                 </p>
               </div>

@@ -1,10 +1,10 @@
 import { useState, useRef } from "react";
 import api from "../lib/api";
-import { UploadCloud } from "lucide-react";
+import { UploadCloud, CheckCircle, XCircle, Loader2 } from "lucide-react";
 
 export default function ReceiptUploader({ userId, onUploadSuccess }) {
   const [file, setFile] = useState(null);
-  const [status, setStatus] = useState("Awaiting receipt...");
+  const [status, setStatus] = useState({ type: "idle", msg: "Awaiting receipt..." });
   const [isUploading, setIsUploading] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
   const inputRef = useRef(null);
@@ -13,9 +13,9 @@ export default function ReceiptUploader({ userId, onUploadSuccess }) {
     if (selectedFile) {
       if (selectedFile.type.startsWith('image/')) {
         setFile(selectedFile);
-        setStatus(`Ready to upload: ${selectedFile.name}`);
+        setStatus({ type: "idle", msg: `Ready to upload: ${selectedFile.name}` });
       } else {
-        setStatus("❌ Please select an image file");
+        setStatus({ type: "error", msg: "Please select an image file" });
       }
     }
   };
@@ -53,11 +53,11 @@ export default function ReceiptUploader({ userId, onUploadSuccess }) {
 
   const handleUpload = async () => {
     if (!file || !userId) {
-      setStatus("❌ Missing file or user not logged in");
+      setStatus({ type: "error", msg: "Missing file or user not logged in" });
       return;
     }
 
-    setStatus("⏳ Uploading & processing...");
+    setStatus({ type: "loading", msg: "Uploading & processing..." });
     setIsUploading(true);
 
     try {
@@ -70,7 +70,7 @@ export default function ReceiptUploader({ userId, onUploadSuccess }) {
         },
       });
 
-      setStatus(`✅ Success! Parsed ₹${res.data.amount?.toFixed(2)} for ${res.data.category}`);
+      setStatus({ type: "success", msg: `Parsed ₹${res.data.amount?.toFixed(2)} for ${res.data.category}` });
       onUploadSuccess();
       setFile(null);
       if (inputRef.current) {
@@ -78,7 +78,7 @@ export default function ReceiptUploader({ userId, onUploadSuccess }) {
       }
     } catch (e) {
       console.error("Upload failed:", e);
-      setStatus(`❌ Upload failed: ${e.response?.data?.detail || e.message}`);
+      setStatus({ type: "error", msg: `Upload failed: ${e.response?.data?.detail || e.message}` });
     } finally {
       setIsUploading(false);
     }
@@ -120,7 +120,14 @@ export default function ReceiptUploader({ userId, onUploadSuccess }) {
       >
         {isUploading ? "Processing..." : "Upload & Parse"}
       </button>
-      <p className="text-xs text-center mt-2 text-gray-500 min-h-[16px]">{status}</p>
+      <p className="text-xs text-center mt-2 min-h-[16px] flex items-center justify-center gap-1">
+        {status.type === "success" && <CheckCircle size={12} className="text-green-500 shrink-0" />}
+        {status.type === "error" && <XCircle size={12} className="text-red-500 shrink-0" />}
+        {status.type === "loading" && <Loader2 size={12} className="text-blue-500 animate-spin shrink-0" />}
+        <span className={status.type === "success" ? "text-green-600" : status.type === "error" ? "text-red-500" : "text-gray-500"}>
+          {status.msg}
+        </span>
+      </p>
     </div>
   );
 }

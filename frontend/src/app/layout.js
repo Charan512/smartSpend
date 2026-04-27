@@ -12,10 +12,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "💰 Smart Expense Tracker",
+  title: "Smart Expense Tracker",
   description: "Track your spending with AI-powered insights",
   icons: {
-    icon: "/favicon.ico", // ✅ now works
+    icon: "/favicon.ico",
   },
 };
 

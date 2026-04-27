@@ -1,6 +1,6 @@
 import { useState } from "react";
 import api from "../lib/api";
-import { FileUp } from "lucide-react";
+import { FileUp, CheckCircle, XCircle } from "lucide-react";
 
 export default function ImportCSV({ userId, onImport }) {
   const [file, setFile] = useState(null);
@@ -20,12 +20,12 @@ export default function ImportCSV({ userId, onImport }) {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       const { imported = 0, skipped = 0 } = res.data;
-      setStatus({ type: "success", msg: `✅ Imported ${imported} expense(s)${skipped > 0 ? `, skipped ${skipped}` : ""}.` });
+      setStatus({ type: "success", msg: `Imported ${imported} expense(s)${skipped > 0 ? `, skipped ${skipped}` : ""}.` });
       onImport();
       setFile(null);
     } catch (error) {
       console.error("CSV import failed:", error);
-      setStatus({ type: "error", msg: "❌ Import failed. Please check the file format (date, description, amount)." });
+      setStatus({ type: "error", msg: "Import failed. Please check the file format (date, description, amount)." });
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,8 @@ export default function ImportCSV({ userId, onImport }) {
         <p className="text-sm text-gray-600 mt-2">Selected: {file.name}</p>
       )}
       {status.msg && (
-        <p className={`text-sm mt-2 ${status.type === "success" ? "text-green-600" : "text-red-600"}`}>
+        <p className={`text-sm mt-2 flex items-center gap-1.5 ${status.type === "success" ? "text-green-600" : "text-red-600"}`}>
+          {status.type === "success" ? <CheckCircle size={14} className="shrink-0" /> : <XCircle size={14} className="shrink-0" />}
           {status.msg}
         </p>
       )}
