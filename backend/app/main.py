@@ -43,12 +43,7 @@ should_run_scheduler = os.getenv("RUN_SCHEDULER", "true").lower() == "true"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Handles startup and shutdown logic."""
-    # --- Startup ---
-    try:
-        from download_models import download_spacy_model
-        download_spacy_model()
-    except Exception as e:
-        print(f"spaCy model download error: {e}")
+
 
     if should_run_scheduler:
         scheduler.add_job(check_budgets_and_goals, 'interval', hours=1)
