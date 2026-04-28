@@ -82,19 +82,19 @@ export default function ExpenseHistory({ userId }) {
         <>
           <div className="space-y-2">
             {expenses.map((exp) => (
-              <div key={exp.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                <div className="flex items-center gap-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[exp.category] || CATEGORY_COLORS.Other}`}>
+              <div key={exp.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0 gap-4 min-w-0">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${CATEGORY_COLORS[exp.category] || CATEGORY_COLORS.Other}`}>
                     {exp.category}
                   </span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800 truncate max-w-[180px]">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-800 truncate" title={exp.description || exp.merchant || "—"}>
                       {exp.description || exp.merchant || "—"}
                     </p>
                     <p className="text-xs text-gray-400">{formatDate(exp.date)}</p>
                   </div>
                 </div>
-                <span className="text-sm font-bold text-red-600">₹{exp.amount.toFixed(2)}</span>
+                <span className="text-sm font-bold text-red-600 shrink-0">₹{exp.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
               </div>
             ))}
           </div>

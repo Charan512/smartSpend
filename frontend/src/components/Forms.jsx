@@ -44,7 +44,7 @@ export function QuickExpenseForm({ userId, onSave }) {
         <PlusCircle size={20} aria-label="Add expense icon" /> Quick Add Expense
       </h3>
       <form onSubmit={handleFormSubmit} className="space-y-3">
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="number"
             placeholder="Amount *"
@@ -133,7 +133,7 @@ export function GoalForm({ userId, onSave }) {
         <Target size={20} aria-label="Target icon" /> Set Budget Goal
       </h3>
       <form onSubmit={handleGoalSubmit} className="space-y-3">
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="text"
             placeholder="Category *"

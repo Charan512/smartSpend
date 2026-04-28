@@ -70,7 +70,7 @@ export default function ReceiptUploader({ userId, onUploadSuccess }) {
         },
       });
 
-      setStatus({ type: "success", msg: `Parsed ₹${res.data.amount?.toFixed(2)} for ${res.data.category}` });
+      setStatus({ type: "success", msg: `Parsed ₹${res.data.amount?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} for ${res.data.category}` });
       onUploadSuccess();
       setFile(null);
       if (inputRef.current) {
@@ -106,10 +106,10 @@ export default function ReceiptUploader({ userId, onUploadSuccess }) {
           disabled={isUploading}
         />
         {file ? (
-          <p className="text-sm font-medium text-blue-600">{file.name}</p>
+          <p className="text-sm font-medium text-blue-600 truncate">{file.name}</p>
         ) : (
           <p className="text-sm text-gray-500">
-            {isUploading ? "Processing..." : "Click to select or drag & drop receipt"}
+            {isUploading ? "Processing..." : "Click or drag & drop receipt"}
           </p>
         )}
       </div>
@@ -120,14 +120,14 @@ export default function ReceiptUploader({ userId, onUploadSuccess }) {
       >
         {isUploading ? "Processing..." : "Upload & Parse"}
       </button>
-      <p className="text-xs text-center mt-2 min-h-[16px] flex items-center justify-center gap-1">
+      <div className="text-xs text-center mt-2 min-h-[16px] flex items-center justify-center gap-1">
         {status.type === "success" && <CheckCircle size={12} className="text-green-500 shrink-0" />}
         {status.type === "error" && <XCircle size={12} className="text-red-500 shrink-0" />}
         {status.type === "loading" && <Loader2 size={12} className="text-blue-500 animate-spin shrink-0" />}
-        <span className={status.type === "success" ? "text-green-600" : status.type === "error" ? "text-red-500" : "text-gray-500"}>
+        <span className={`break-words ${status.type === "success" ? "text-green-600" : status.type === "error" ? "text-red-500" : "text-gray-500"}`}>
           {status.msg}
         </span>
-      </p>
+      </div>
     </div>
   );
 }
