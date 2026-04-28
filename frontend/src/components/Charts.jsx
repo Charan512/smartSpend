@@ -66,6 +66,7 @@ export function SpendingByCategory({ data, userId }) {
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
+            </Pie>
             <Tooltip formatter={(value) => `₹${value?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '0.00'}`} />
           </PieChart>
         </ResponsiveContainer>
@@ -184,6 +185,7 @@ export function ExpenseForecast({ data }) {
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="date" />
+            <YAxis />
             <Tooltip formatter={(value) => `₹${value?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '0.00'}`} />
             <Legend />
             <Line type="monotone" dataKey="amount" name="History" stroke="#8884d8" strokeWidth={2} />
