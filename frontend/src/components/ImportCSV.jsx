@@ -36,20 +36,20 @@ export default function ImportCSV({ userId, onImport }) {
       <h3 className="font-bold text-orange-600 mb-4 flex items-center gap-2">
         <FileUp size={20} aria-label="File upload icon" /> Import from CSV
       </h3>
-      <div className="flex items-center gap-4">
+      <div className="space-y-4">
         <input
           type="file"
           accept=".csv,.txt"
           onChange={(e) => setFile(e.target.files[0])}
-          className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+          className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-gray-100 rounded-lg p-2"
           disabled={loading}
         />
         <button
           onClick={handleUpload}
           disabled={!file || loading}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          className="w-full bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
         >
-          {loading ? "Uploading..." : "Upload"}
+          {loading ? "Uploading..." : "Upload & Process CSV"}
         </button>
       </div>
       {file && (
