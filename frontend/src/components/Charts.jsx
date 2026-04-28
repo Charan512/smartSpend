@@ -66,8 +66,7 @@ export function SpendingByCategory({ data, userId }) {
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
-            </Pie>
-            <Tooltip formatter={(value) => `₹${value?.toFixed(2) || '0.00'}`} />
+            <Tooltip formatter={(value) => `₹${value?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '0.00'}`} />
           </PieChart>
         </ResponsiveContainer>
       ) : (
@@ -136,7 +135,7 @@ export function SpendingByCategory({ data, userId }) {
                                     <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
                                   ))}
                                 </Pie>
-                                <Tooltip formatter={(value) => `₹${value?.toFixed(2) || '0.00'}`} />
+                                <Tooltip formatter={(value) => `₹${value?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '0.00'}`} />
                               </PieChart>
                             </ResponsiveContainer>
                           ) : (
@@ -145,8 +144,8 @@ export function SpendingByCategory({ data, userId }) {
                             </div>
                           )}
                         </div>
-                        <p className="text-sm text-gray-600 mt-2">
-                          Total: ₹{month.total_spent?.toLocaleString() || '0.00'}
+                        <p className="text-sm text-gray-600 mt-2 truncate" title={month.total_spent?.toLocaleString() || '0.00'}>
+                          Total: ₹{month.total_spent?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '0.00'}
                         </p>
                       </div>
                     );
@@ -185,8 +184,7 @@ export function ExpenseForecast({ data }) {
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="date" />
-            <YAxis />
-            <Tooltip formatter={(value) => `₹${value?.toFixed(2) || '0.00'}`} />
+            <Tooltip formatter={(value) => `₹${value?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '0.00'}`} />
             <Legend />
             <Line type="monotone" dataKey="amount" name="History" stroke="#8884d8" strokeWidth={2} />
             <Line type="monotone" dataKey="predicted" name="Forecast" stroke="#82ca9d" strokeWidth={2} strokeDasharray="5 5" />

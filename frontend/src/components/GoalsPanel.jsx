@@ -80,14 +80,14 @@ export default function GoalsPanel({ userId, summary }) {
             const over = Math.max(spent - goal.target_amount, 0);
 
             return (
-              <div key={goal.id} className="space-y-1">
+              <div key={goal.id} className="space-y-1 min-w-0">
                 <div className="flex justify-between text-sm font-medium">
-                  <span className="text-gray-700 capitalize">{goal.category}</span>
-                  <span className="text-gray-500 text-xs">{goal.period}</span>
+                  <span className="text-gray-700 capitalize truncate pr-2" title={goal.category}>{goal.category}</span>
+                  <span className="text-gray-500 text-xs shrink-0">{goal.period}</span>
                 </div>
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>₹{spent.toFixed(2)} spent</span>
-                  <span>Target: ₹{goal.target_amount.toFixed(2)}</span>
+                <div className="flex justify-between text-xs text-gray-500 gap-2">
+                  <span className="truncate">₹{spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} spent</span>
+                  <span className="truncate shrink-0">Target: ₹{goal.target_amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2">
                   <div
@@ -97,12 +97,12 @@ export default function GoalsPanel({ userId, summary }) {
                 </div>
                 <p className="text-xs">
                   {over > 0 ? (
-                    <span className="text-red-500 font-medium flex items-center gap-1">
-                      <AlertTriangle size={12} className="shrink-0" /> ₹{over.toFixed(2)} over budget
+                    <span className="text-red-500 font-medium flex items-center gap-1 overflow-hidden">
+                      <AlertTriangle size={12} className="shrink-0" /> <span className="truncate">₹{over.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} over budget</span>
                     </span>
                   ) : (
-                    <span className="text-green-600 flex items-center gap-1">
-                      <CheckCircle size={12} className="shrink-0" /> ₹{remaining.toFixed(2)} remaining
+                    <span className="text-green-600 flex items-center gap-1 overflow-hidden">
+                      <CheckCircle size={12} className="shrink-0" /> <span className="truncate">₹{remaining.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} remaining</span>
                     </span>
                   )}
                 </p>
