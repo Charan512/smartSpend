@@ -2,6 +2,11 @@ import { useState } from "react";
 import api from "../lib/api";
 import { PlusCircle, Target } from "lucide-react";
 
+// Matches DEFAULT_CATEGORY_PERCENTAGES in backend/app/crud.py
+export const CATEGORIES = ["Food", "Shopping", "Transport", "Entertainment", "Bills", "Other"];
+
+const selectClass = "w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 appearance-none cursor-pointer";
+
 export function QuickExpenseForm({ userId, onSave }) {
   const [form, setForm] = useState({ amount: "", category: "", description: "", merchant: "" });
   const [loading, setLoading] = useState(false);
@@ -55,14 +60,17 @@ export function QuickExpenseForm({ userId, onSave }) {
             min="0.01"
             step="0.01"
           />
-          <input
-            type="text"
-            placeholder="Category *"
+          <select
             value={form.category}
             onChange={(e) => setForm({ ...form, category: e.target.value })}
-            className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`${selectClass} focus:ring-blue-500`}
             required
-          />
+          >
+            <option value="" disabled>Category *</option>
+            {CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
         </div>
         <input
           type="text"
@@ -134,14 +142,17 @@ export function GoalForm({ userId, onSave }) {
       </h3>
       <form onSubmit={handleGoalSubmit} className="space-y-3">
         <div className="flex flex-col sm:flex-row gap-3">
-          <input
-            type="text"
-            placeholder="Category *"
+          <select
             value={goalForm.category}
             onChange={(e) => setGoalForm({ ...goalForm, category: e.target.value })}
-            className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className={`${selectClass} focus:ring-green-500`}
             required
-          />
+          >
+            <option value="" disabled>Category *</option>
+            {CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
           <input
             type="number"
             placeholder="Target Amount *"
@@ -156,7 +167,7 @@ export function GoalForm({ userId, onSave }) {
         <select
           value={goalForm.period}
           onChange={(e) => setGoalForm({ ...goalForm, period: e.target.value })}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+          className={`${selectClass} focus:ring-green-500`}
         >
           <option value="monthly">Monthly</option>
           <option value="weekly">Weekly</option>
