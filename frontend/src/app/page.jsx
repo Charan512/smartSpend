@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { 
   MessageSquare, 
   Camera, 
@@ -122,10 +123,6 @@ export default function LandingPage() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, [router]);
-
-  const handleCtaClick = () => {
-    router.push("/login");
-  };
 
   return (
     <>
@@ -284,9 +281,9 @@ export default function LandingPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
           <a href="#features" className="nav-link">Features</a>
           <a href="#how-it-works" className="nav-link">How It Works</a>
-          <button className="cta-btn cta-primary" style={{ padding: "10px 24px", fontSize: "0.875rem" }} onClick={handleCtaClick}>
+          <Link href="/login" className="cta-btn cta-primary" style={{ padding: "10px 24px", fontSize: "0.875rem" }}>
             Get Started <ArrowRight className="arrow-anim" size={16} />
-          </button>
+          </Link>
         </div>
       </nav>
 
@@ -347,9 +344,9 @@ export default function LandingPage() {
           </p>
 
           <div className="fade-up fade-up-d3" style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
-            <button className="cta-btn cta-primary" onClick={handleCtaClick} style={{ fontSize: "1.05rem", padding: "15px 36px" }}>
+            <Link href="/login" className="cta-btn cta-primary" style={{ fontSize: "1.05rem", padding: "15px 36px" }}>
               Start Saving Free <ArrowRight className="arrow-anim" size={18} />
-            </button>
+            </Link>
             <button className="cta-btn cta-outline" onClick={() => document.getElementById("features").scrollIntoView({ behavior: "smooth" })}>
               See How It Works
             </button>
@@ -471,13 +468,13 @@ export default function LandingPage() {
           </p>
 
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
-            <button
+            <Link
+              href="/login"
               className="cta-btn"
               style={{ background: "#EAB308", color: "#111", fontSize: "1.05rem", padding: "15px 36px" }}
-              onClick={handleCtaClick}
             >
               Open My Dashboard <ArrowRight className="arrow-anim" size={18} />
-            </button>
+            </Link>
           </div>
 
           {/* color bar */}
