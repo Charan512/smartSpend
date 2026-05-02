@@ -123,7 +123,9 @@ export default function LandingPage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, [router]);
 
-  const goToDashboard = () => router.push("/dashboard");
+  const handleCtaClick = () => {
+    router.push("/login");
+  };
 
   return (
     <>
@@ -282,7 +284,7 @@ export default function LandingPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
           <a href="#features" className="nav-link">Features</a>
           <a href="#how-it-works" className="nav-link">How It Works</a>
-          <button className="cta-btn cta-primary" style={{ padding: "10px 24px", fontSize: "0.875rem" }} onClick={goToDashboard}>
+          <button className="cta-btn cta-primary" style={{ padding: "10px 24px", fontSize: "0.875rem" }} onClick={handleCtaClick}>
             Get Started <ArrowRight className="arrow-anim" size={16} />
           </button>
         </div>
@@ -345,7 +347,7 @@ export default function LandingPage() {
           </p>
 
           <div className="fade-up fade-up-d3" style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
-            <button className="cta-btn cta-primary" onClick={goToDashboard} style={{ fontSize: "1.05rem", padding: "15px 36px" }}>
+            <button className="cta-btn cta-primary" onClick={handleCtaClick} style={{ fontSize: "1.05rem", padding: "15px 36px" }}>
               Start Saving Free <ArrowRight className="arrow-anim" size={18} />
             </button>
             <button className="cta-btn cta-outline" onClick={() => document.getElementById("features").scrollIntoView({ behavior: "smooth" })}>
@@ -472,7 +474,7 @@ export default function LandingPage() {
             <button
               className="cta-btn"
               style={{ background: "#EAB308", color: "#111", fontSize: "1.05rem", padding: "15px 36px" }}
-              onClick={goToDashboard}
+              onClick={handleCtaClick}
             >
               Open My Dashboard <ArrowRight className="arrow-anim" size={18} />
             </button>
