@@ -8,10 +8,9 @@ export default function SmartChat({ userId, onNewExpense }) {
   const [status, setStatus] = useState("Connecting...");
   const [loading, setLoading] = useState(false);
   const ws = useRef(null);
-  const messagesEndRef = useRef(null);
-  // Track whether we're past the initial history load so we don't auto-scroll
-  // the whole page on mount when chat history is populated.
-  const isInitialLoad = useRef(true);
+  // Ref on the scrollable messages container — we scroll it directly via scrollTop
+  // instead of using scrollIntoView, which would scroll the whole page.
+  const chatContainerRef = useRef(null);
 
   const onNewExpenseRef = useRef(onNewExpense);
   useEffect(() => {
@@ -81,8 +80,11 @@ export default function SmartChat({ userId, onNewExpense }) {
             { sender: 'bot', text: item.response }
           ]);
           setMessages(historyMessages);
-          // Mark initial load done so subsequent messages trigger auto-scroll
-          isInitialLoad.current = false;
+          // Scroll chat to bottom to show the most recent history
+          // (using scrollTop so only the chat container scrolls, not the page)
+          if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+          }
         }
         else if (data.type === "update") {
           setMessages(prev => [...prev, { sender: 'bot', text: data.data }]);
@@ -119,11 +121,12 @@ export default function SmartChat({ userId, onNewExpense }) {
     };
   }, [connectWebSocket]);
 
+  // Scroll the chat container to the bottom whenever messages change.
+  // Using scrollTop directly on the container (not scrollIntoView) so that
+  // only the chat's internal scroll is affected — the page never jumps.
   useEffect(() => {
-    // Only scroll to bottom for new messages, not for the initial history load.
-    // This prevents the whole page from jumping down to the chat box on login.
-    if (!isInitialLoad.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [messages]);
 
@@ -154,7 +157,7 @@ export default function SmartChat({ userId, onNewExpense }) {
           {status}
         </div>
       </div>
-      <div className="flex-1 p-4 overflow-y-auto">
+      <div ref={chatContainerRef} className="flex-1 p-4 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="text-center text-gray-500 mt-8">
             Start a conversation about your expenses...
@@ -193,7 +196,7 @@ export default function SmartChat({ userId, onNewExpense }) {
             </div>
           </div>
         )}
-        <div ref={messagesEndRef} />
+        <div />
       </div>
       <form onSubmit={sendMessage} className="p-4 border-t flex items-center gap-2">
         <input
