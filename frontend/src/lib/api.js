@@ -20,12 +20,18 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Clear storage and redirect to login if unauthorized
-      localStorage.removeItem("token");
-      localStorage.removeItem("userId");
-      localStorage.removeItem("email");
-      localStorage.removeItem("monthly_budget");
-      window.location.href = "/";
+      const requestUrl = error.config?.url || "";
+      // Skip redirect for auth endpoints — let the component handle the error
+      const isAuthEndpoint = requestUrl.includes("/login") || requestUrl.includes("/register");
+
+      if (!isAuthEndpoint) {
+        // Expired session: clear storage and return to landing page
+        localStorage.removeItem("token");
+        localStorage.removeItem("userId");
+        localStorage.removeItem("email");
+        localStorage.removeItem("monthly_budget");
+        window.location.href = "/";
+      }
     }
     return Promise.reject(error);
   }

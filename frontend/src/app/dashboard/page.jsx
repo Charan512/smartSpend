@@ -24,10 +24,11 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Load summary + forecast in parallel
-  const loadDashboard = useCallback(async (uid) => {
+  // Load summary + forecast in parallel.
+  // Pass silent=true for background refreshes so the full loading screen isn't shown.
+  const loadDashboard = useCallback(async (uid, silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError("");
       const [summaryRes, forecastRes] = await Promise.all([
         api.get(`/monthly_summary/${uid}`),
@@ -39,7 +40,7 @@ export default function App() {
       console.error("Failed to fetch dashboard data:", e);
       setError("Failed to load dashboard. Please check your connection and try again.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -69,9 +70,10 @@ export default function App() {
     router.push("/");
   };
 
+  // Silent refresh — updates charts/cards without flashing the loading screen
   const handleDataUpdate = () => {
     if (userId) {
-      loadDashboard(userId);
+      loadDashboard(userId, true);
     }
   };
 
