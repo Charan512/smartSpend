@@ -9,6 +9,9 @@ export default function SmartChat({ userId, onNewExpense }) {
   const [loading, setLoading] = useState(false);
   const ws = useRef(null);
   const messagesEndRef = useRef(null);
+  // Track whether we're past the initial history load so we don't auto-scroll
+  // the whole page on mount when chat history is populated.
+  const isInitialLoad = useRef(true);
 
   const onNewExpenseRef = useRef(onNewExpense);
   useEffect(() => {
@@ -78,6 +81,8 @@ export default function SmartChat({ userId, onNewExpense }) {
             { sender: 'bot', text: item.response }
           ]);
           setMessages(historyMessages);
+          // Mark initial load done so subsequent messages trigger auto-scroll
+          isInitialLoad.current = false;
         }
         else if (data.type === "update") {
           setMessages(prev => [...prev, { sender: 'bot', text: data.data }]);
@@ -115,7 +120,11 @@ export default function SmartChat({ userId, onNewExpense }) {
   }, [connectWebSocket]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Only scroll to bottom for new messages, not for the initial history load.
+    // This prevents the whole page from jumping down to the chat box on login.
+    if (!isInitialLoad.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
 
   const sendMessage = (e) => {
