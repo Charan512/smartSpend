@@ -1,4 +1,5 @@
 import re
+import logging
 from datetime import datetime, timedelta
 from dateutil import parser
 from sqlalchemy.orm import Session
@@ -8,6 +9,8 @@ import joblib
 import pandas as pd
 
 from . import models
+
+logger = logging.getLogger(__name__)
 
 # ==============================
 # Load NLP + ML models
@@ -107,14 +110,16 @@ def extract_amount(text: str):
             if ent.label_ == "MONEY":
                 try:
                     return float(re.sub(r'[^\d.]', '', ent.text))
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as e:
+                    logger.warning("Failed to parse MONEY entity '%s': %s", ent.text, e)
                     continue
     
     match = re.search(r"(\d[\d,]*\.?\d*)", text)
     if match:
         try:
             return float(match.group(1).replace(",", ""))
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as e:
+            logger.warning("Failed to parse amount from regex match '%s': %s", match.group(1), e)
             return None
     return None
 
@@ -141,8 +146,8 @@ def extract_date(text: str):
              parsed = parser.parse(match.group(1), fuzzy=True, default=today)
              if 2000 <= parsed.year <= today.year + 1:
                 return parsed
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Date extraction failed for text '%s': %s", text[:80], e)
     return None
 
 def extract_merchant(text: str):
@@ -163,8 +168,8 @@ def classify_category(text: str):
     if category_model:
         try:
             return category_model.predict([text])[0]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("ML category classifier failed: %s. Falling back to keyword matching.", e)
 
     t = text.lower()
     if any(word in t for word in ["food", "lunch", "coffee", "restaurant", "grocer", "meal", "swiggy", "zomato"]): return "Food"

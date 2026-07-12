@@ -96,12 +96,16 @@ is_prod = os.getenv("ENVIRONMENT") == "production"
 
 if env_origins:
     allowed_origins = [origin.strip() for origin in env_origins.split(",")]
-elif not is_prod:
-    # In development, we can be lax if no CORS_ORIGINS is set
-    allowed_origins = ["*"]
-else:
+elif is_prod:
     # In production, we MUST have specific origins defined
     raise RuntimeError("CORS_ORIGINS environment variable is REQUIRED in production mode!")
+else:
+    # Fix 7: In development, restrict to explicit localhost origins instead of wildcard
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+    ]
 
 app.add_middleware(
     CORSMiddleware,
@@ -176,60 +180,94 @@ def login(request: Request, user: schemas.UserLogin, db: Session = Depends(get_d
     }
 
 @app.websocket("/ws/chat/{user_id}")
-async def websocket_chat(websocket: WebSocket, user_id: int, token: str = None):
-    # Validate token manually since Depends doesn't work perfectly with websockets
+async def websocket_chat(websocket: WebSocket, user_id: int):
+    # Fix 2: Accept the connection first, then authenticate via the first message
+    # (previously the token was passed in the URL query param, which gets logged by proxies)
+    await websocket.accept()
     db = None
     try:
-        db = SessionLocal()
-        if not token:
-            await websocket.close(code=1008)
+        # Step 1: Wait for the first message which must be the auth token
+        try:
+            auth_data_raw = await asyncio.wait_for(websocket.receive_text(), timeout=10.0)
+        except asyncio.TimeoutError:
+            await websocket.close(code=1008, reason="Authentication timeout")
             return
-            
+
+        try:
+            auth_data = json.loads(auth_data_raw)
+        except json.JSONDecodeError:
+            await websocket.close(code=1008, reason="Invalid auth message format")
+            return
+
+        if auth_data.get("type") != "auth" or not auth_data.get("token"):
+            await websocket.close(code=1008, reason="Missing auth token")
+            return
+
+        token = auth_data["token"]
+
         import jwt
         from app.auth import SECRET_KEY, ALGORITHM
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             token_user_id = payload.get("sub")
             if token_user_id is None or int(token_user_id) != user_id:
-                await websocket.close(code=1008)
+                await websocket.close(code=1008, reason="Token user mismatch")
                 return
         except jwt.PyJWTError:
-            await websocket.close(code=1008)
+            await websocket.close(code=1008, reason="Invalid token")
             return
-            
+
+        # Step 2: Auth passed — register the connection and send history
         await manager.connect(user_id, websocket)
 
-        history = crud.get_chat_history(db, user_id, limit=5)
-        history_data = []
-        for h in history:
-            # Simplified history format to avoid serialization issues
-            history_data.append({
-                "message": h.message,
-                "response": h.response,
-                "timestamp": h.timestamp.isoformat() if h.timestamp else None
-            })
-        await manager.send_personal_message(user_id, json.dumps({"type": "history", "data": history_data}))
-    except Exception as e:
-        await manager.send_personal_message(user_id, json.dumps({"type": "error", "data": f"History error: {str(e)}"}))
-    finally:
-        if db:
-            db.close()
-    
-    try:
+        db = SessionLocal()
+        try:
+            history = crud.get_chat_history(db, user_id, limit=5)
+            history_data = []
+            for h in history:
+                history_data.append({
+                    "message": h.message,
+                    "response": h.response,
+                    "timestamp": h.timestamp.isoformat() if h.timestamp else None
+                })
+            await manager.send_personal_message(user_id, json.dumps({"type": "history", "data": history_data}))
+        except Exception as e:
+            await manager.send_personal_message(user_id, json.dumps({"type": "error", "data": f"History error: {str(e)}"}))
+        finally:
+            if db:
+                db.close()
+
+        # Fix 3: Per-user rate limiting — track last message time to prevent spam
+        last_message_time = 0.0
+        RATE_LIMIT_SECONDS = 0.5  # Max 2 messages per second
+
+        # Step 3: Enter the main message loop
         while True:
-            data = await websocket.receive_text() 
+            data = await websocket.receive_text()
+
+            # Fix 3: Enforce rate limit
+            import time
+            now = time.monotonic()
+            if now - last_message_time < RATE_LIMIT_SECONDS:
+                await manager.send_personal_message(user_id, json.dumps({
+                    "type": "error",
+                    "data": "You're sending messages too fast. Please wait a moment."
+                }))
+                continue
+            last_message_time = now
+
             db = None
             try:
-                db = SessionLocal() 
+                db = SessionLocal()
                 response_msg, is_expense = nlp.process_chat_message(db, user_id, data)
                 crud.save_chat_history(db, user_id, data, response_msg)
-                
+
                 await manager.send_personal_message(user_id, json.dumps({
-                    "type": "update", 
-                    "data": response_msg, 
+                    "type": "update",
+                    "data": response_msg,
                     "is_expense": is_expense
                 }))
-                
+
             except Exception as e:
                 await manager.send_personal_message(user_id, json.dumps({"type": "error", "data": str(e)}))
             finally:
@@ -242,6 +280,7 @@ async def websocket_chat(websocket: WebSocket, user_id: int, token: str = None):
     except Exception as e:
         print(f"WebSocket Error for {user_id}: {str(e)}")
         await manager.disconnect(user_id)
+
 
 # --- Uploads ---
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
@@ -293,7 +332,9 @@ async def upload_csv(user_id: int, file: UploadFile = File(...), db: Session = D
         raise HTTPException(status_code=400, detail="Only CSV or TXT files are allowed")
     
     try:
-        return crud.import_csv(db, user_id, contents)
+        # Fix 1: Run synchronous CSV parsing in a thread pool to avoid blocking the event loop
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, crud.import_csv, db, user_id, contents)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error importing CSV: {str(e)}")
 
@@ -333,10 +374,12 @@ def get_monthly_summary_route(user_id: int, db: Session = Depends(get_db), curre
         raise HTTPException(status_code=500, detail=f"Error fetching monthly summary: {str(e)}")
 
 @app.get("/forecast_expenses/{user_id}")
-def forecast_expenses_route(user_id: int, months: int = 3, db: Session = Depends(get_db), current_user: schemas.UserOut = Depends(auth.get_current_user)):
+async def forecast_expenses_route(user_id: int, months: int = 3, db: Session = Depends(get_db), current_user: schemas.UserOut = Depends(auth.get_current_user)):
     if current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
-    return crud.forecast_expenses(db, user_id, months)
+    # Fix 1: Run CPU-intensive ML forecasting in a thread pool to avoid blocking the event loop
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, crud.forecast_expenses, db, user_id, months)
 
 @app.get("/budget/optimize/{user_id}")
 def budget_optimize(user_id: int, db: Session = Depends(get_db), current_user: schemas.UserOut = Depends(auth.get_current_user)):

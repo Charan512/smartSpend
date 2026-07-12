@@ -5,6 +5,11 @@ import io
 import os
 import subprocess
 
+# Fix 4: Prevent image decompression bomb attacks.
+# If an uploaded image expands beyond 20MP (e.g. a 5MB file → 50,000×50,000px),
+# Pillow will raise a DecompressionBombError automatically.
+Image.MAX_IMAGE_PIXELS = 20_000_000  # ~4900×4100 px
+
 # Check if Tesseract is properly installed
 try:
     # Test if tesseract command works

@@ -10,11 +10,24 @@ SECRET_KEY = os.environ.get("JWT_SECRET")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
-# Enforce secret key in production
+# Fix 5: Only allow the hardcoded dev fallback when ENVIRONMENT is *explicitly* "development".
+# Any other value (staging, test, unset, production) must have JWT_SECRET configured.
+# This prevents a misconfigured staging/test server from using the known dev secret.
+_env = os.environ.get("ENVIRONMENT", "")
 if not SECRET_KEY:
-    if os.environ.get("ENVIRONMENT") == "production":
-        raise RuntimeError("JWT_SECRET environment variable is REQUIRED in production mode!")
-    SECRET_KEY = "dev-secret-key-only-for-local-development"
+    if _env == "development":
+        SECRET_KEY = "dev-secret-key-only-for-local-development"
+        import warnings
+        warnings.warn(
+            "JWT_SECRET not set — using insecure dev fallback. "
+            "Set JWT_SECRET in your .env file.",
+            stacklevel=1,
+        )
+    else:
+        raise RuntimeError(
+            f"JWT_SECRET environment variable is REQUIRED (ENVIRONMENT='{_env}'). "
+            "Set it in your .env file or environment."
+        )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 

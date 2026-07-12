@@ -28,14 +28,27 @@ export default function SmartChat({ userId, onNewExpense }) {
 
     console.log("Starting WebSocket connection...");
     const token = localStorage.getItem("token");
-    const wsUrl = `${WS_BASE}/ws/chat/${userId}${token ? `?token=${token}` : ''}`;
+    // Fix 2: Do NOT append token as a URL query param — it gets logged by proxies.
+    // Instead we authenticate via the first message after connection opens.
+    const wsUrl = `${WS_BASE}/ws/chat/${userId}`;
     const socket = new WebSocket(wsUrl);
     ws.current = socket;
 
     socket.onopen = () => {
+      // Fix 2: Send auth token as the very first message
+      if (token) {
+        socket.send(JSON.stringify({ type: "auth", token }));
+      } else {
+        // No token — server will close connection
+        console.error("No auth token available for WebSocket authentication.");
+        setStatus("Authentication failed. Please log in again.");
+        socket.close();
+        return;
+      }
       setStatus("Connected");
       reconnectAttemptsRef.current = 0; // Reset reconnect attempts on successful connection
     };
+
 
     socket.onclose = () => {
       setStatus("Disconnected");
